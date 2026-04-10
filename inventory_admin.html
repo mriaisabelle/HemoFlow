@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HemoFlow - Admin Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        [x-cloak] { display: none !important; }
+        .bg-blood-red { background-color: #b91c1c; }
+        .text-blood-red { color: #b91c1c; }
+        .border-blood-red { border-color: #b91c1c; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans" x-data="bloodApp()">
+
+    <nav class="bg-white border-b px-12 py-4 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <img src="mainlogo.png" alt="HemoFlow Logo" class="h-10 w-auto">
+            <span class="text-2xl font-bold text-blood-red tracking-tight">HemoFlow</span>
+        </div>
+
+        <div class="hidden lg:flex space-x-10 font-medium text-gray-700">
+            <a href="admin_dashboard.php">Admin Panel</a>
+        </div>
+
+        <div class="flex items-center">
+            <button class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-2 rounded-full text-sm font-bold transition-all">
+                Sign Out
+            </button>
+        </div>
+    </nav>
+
+    <main class="p-8 max-w-7xl mx-auto">
+        <div class="mb-6 flex justify-between items-end">
+            <div>
+                <nav class="text-sm text-gray-400 mb-2">Admin Dashboard > <span class="text-blood-red">Blood Inventory Management</span></nav>
+                <h1 class="text-3xl font-bold">Blood Inventory Management</h1>
+                <p class="text-gray-500">Update stock levels, set capacity limits, and manage reservations.</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+            <div class="bg-white p-4 rounded-xl border shadow-sm">
+                <div class="flex items-center space-x-3 mb-2">
+                    <div class="p-2 bg-red-50 text-red-500 rounded-lg"><i class="fas fa-tint"></i></div>
+                    <h3 class="text-2xl font-bold" x-text="totalUnits().toLocaleString()">0</h3>
+                </div>
+                <p class="text-xs text-gray-400">Total Units of 1,100 capacity</p>
+            </div>
+            <div class="bg-white p-4 rounded-xl border shadow-sm">
+                <div class="flex items-center space-x-3 mb-2">
+                    <div class="p-2 bg-red-100 text-red-600 rounded-lg"><i class="fas fa-bell"></i></div>
+                    <h3 class="text-2xl font-bold" x-text="countByStatus('Critical')">0</h3>
+                </div>
+                <p class="text-xs text-gray-400">Critical Types need action</p>
+            </div>
+            <div class="bg-white p-4 rounded-xl border shadow-sm">
+                <div class="flex items-center space-x-3 mb-2">
+                    <div class="p-2 bg-orange-100 text-orange-500 rounded-lg"><i class="fas fa-exclamation-triangle"></i></div>
+                    <h3 class="text-2xl font-bold" x-text="countByStatus('Low')">0</h3>
+                </div>
+                <p class="text-xs text-gray-400">Low Stock below 40%</p>
+            </div>
+            <div class="bg-white p-4 rounded-xl border shadow-sm">
+                <div class="flex items-center space-x-3 mb-2">
+                    <div class="p-2 bg-green-100 text-green-600 rounded-lg"><i class="fas fa-check-circle"></i></div>
+                    <h3 class="text-2xl font-bold" x-text="countByStatus('Adequate') + countByStatus('Good')">0</h3>
+                </div>
+                <p class="text-xs text-gray-400">Healthy Stock</p>
+            </div>
+            <div class="bg-white p-4 rounded-xl border shadow-sm">
+                <div class="flex items-center space-x-3 mb-2">
+                    <div class="p-2 bg-yellow-100 text-yellow-600 rounded-lg"><i class="fas fa-bookmark"></i></div>
+                    <h3 class="text-2xl font-bold">68</h3>
+                </div>
+                <p class="text-xs text-gray-400">Reserved Units</p>
+            </div>
+        </div>
+
+        <div class="flex bg-gray-100 p-1 rounded-xl w-fit mb-6">
+            <button @click="view = 'inventory'" :class="view === 'inventory' ? 'bg-white shadow text-blood-red' : 'text-gray-500'" class="px-6 py-2 rounded-lg font-medium transition-all">
+                <i class="fas fa-box-open mr-2"></i> Inventory
+            </button>
+            <button @click="view = 'audit'" :class="view === 'audit' ? 'bg-blood-red text-white' : 'text-gray-500'" class="px-6 py-2 rounded-lg font-medium transition-all flex items-center">
+                <i class="fas fa-history mr-2"></i> Audit Log <span class="ml-2 bg-white/20 px-2 rounded-full text-xs" x-text="filteredAuditLogs().length">0</span>
+            </button>
+        </div>
+
+        <div x-show="view === 'inventory'">
+            <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+                <div class="flex space-x-2">
+                    <template x-for="f in ['All Types', 'Critical', 'Low', 'Adequate', 'Good']">
+                        <button 
+                            @click="filter = f" 
+                            :class="filter === f ? 'bg-blood-red text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                            class="px-4 py-1.5 rounded-full text-sm font-medium transition-colors"
+                            x-text="f">
+                        </button>
+                    </template>
+                </div>
+                <div class="bg-gray-100 p-1 rounded-lg flex">
+                    <button @click="display = 'grid'" :class="display === 'grid' ? 'bg-white shadow' : ''" class="p-2 rounded-md px-4 text-sm transition-all"><i class="fas fa-th-large mr-2"></i>Grid</button>
+                    <button @click="display = 'table'" :class="display === 'table' ? 'bg-white shadow' : ''" class="p-2 rounded-md px-4 text-sm transition-all"><i class="fas fa-list mr-2"></i>Table</button>
+                </div>
+            </div>
+
+            <div x-show="display === 'grid'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <template x-for="item in filteredInventory()" :key="item.type">
+                    <div class="bg-white rounded-3xl border overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                        <div class="bg-blood-red p-6 pb-12 relative">
+                            <h2 class="text-white text-5xl font-black" x-text="item.type"></h2>
+                            <span :class="getStatusClass(item.status)" class="absolute bottom-4 left-6 px-4 py-1 rounded-full text-xs font-bold" x-text="item.status"></span>
+                            <div class="absolute right-[-10px] top-4 w-24 h-24 bg-white opacity-10 rounded-full"></div>
+                        </div>
+                        <div class="p-6 -mt-6 bg-white rounded-t-3xl border-t">
+                            <div class="flex justify-between items-end mb-1">
+                                <span class="font-bold text-lg"><span x-text="item.units"></span> units</span>
+                                <span class="text-xs text-gray-400" x-text="Math.round((item.units/item.max)*100) + '% of ' + item.max"></span>
+                            </div>
+                            <div class="w-full bg-gray-100 h-2 rounded-full mb-4">
+                                <div class="h-2 rounded-full transition-all duration-500" :class="getBarColor(item.status)" :style="`width: ${(item.units/item.max)*100}%`"></div>
+                            </div>
+                            
+                            <div class="space-y-2 text-xs text-gray-500 mb-6">
+                                <p><i class="fas fa-map-marker-alt w-5"></i> <span x-text="item.location"></span></p>
+                                <p><i class="fas fa-bookmark w-5"></i> <span x-text="item.reserved"></span> reserved</p>
+                                <p><i class="far fa-clock w-5"></i> Expires in <span x-text="item.expiry"></span> days</p>
+                            </div>
+
+                            <div class="flex items-center space-x-2">
+                                <div class="flex items-center border rounded-lg bg-gray-50 flex-1 justify-between p-1">
+                                    <button @click="updateStock(item, -5)" class="w-8 h-8 flex items-center justify-center hover:bg-white rounded shadow-sm">-5</button>
+                                    <span class="text-xs font-bold text-gray-400 uppercase">Quick</span>
+                                    <button @click="updateStock(item, 5)" class="w-8 h-8 flex items-center justify-center hover:bg-white rounded shadow-sm">+5</button>
+                                </div>
+                                <button @click="openEdit(item)" class="bg-blood-red text-white p-2 px-4 rounded-lg flex items-center text-sm font-bold hover:opacity-90">
+                                    <i class="fas fa-edit mr-2"></i> Edit
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <div x-show="display === 'table'" class="bg-white border rounded-xl overflow-hidden shadow-sm">
+                <table class="w-full text-left">
+                    <thead class="bg-gray-50 border-b text-sm text-gray-500">
+                        <tr>
+                            <th class="p-4">Blood Type</th>
+                            <th class="p-4">Status</th>
+                            <th class="p-4">Units</th>
+                            <th class="p-4">Location</th>
+                            <th class="p-4 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="item in filteredInventory()">
+                            <tr class="border-b hover:bg-gray-50">
+                                <td class="p-4 font-bold text-lg" x-text="item.type"></td>
+                                <td class="p-4"><span :class="getStatusClass(item.status)" class="px-3 py-1 rounded-full text-xs" x-text="item.status"></span></td>
+                                <td class="p-4" x-text="item.units + ' / ' + item.max"></td>
+                                <td class="p-4 text-gray-500" x-text="item.location"></td>
+                                <td class="p-4 text-right">
+                                    <button @click="openEdit(item)" class="text-blood-red hover:underline font-bold">Edit</button>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-12 bg-white p-6 rounded-xl border border-gray-100">
+                <h4 class="font-bold mb-4">Stock Level Guide</h4>
+                <div class="flex flex-wrap gap-8">
+                    <div class="flex items-center space-x-2"><span class="w-3 h-3 rounded-full bg-red-600"></span> <div><p class="text-sm font-bold">Critical</p><p class="text-xs text-gray-400">0-20% capacity</p></div></div>
+                    <div class="flex items-center space-x-2"><span class="w-3 h-3 rounded-full bg-orange-400"></span> <div><p class="text-sm font-bold">Low</p><p class="text-xs text-gray-400">21-40% capacity</p></div></div>
+                    <div class="flex items-center space-x-2"><span class="w-3 h-3 rounded-full bg-yellow-400"></span> <div><p class="text-sm font-bold">Adequate</p><p class="text-xs text-gray-400">41-70% capacity</p></div></div>
+                    <div class="flex items-center space-x-2"><span class="w-3 h-3 rounded-full bg-green-500"></span> <div><p class="text-sm font-bold">Good</p><p class="text-xs text-gray-400">71-100% capacity</p></div></div>
+                </div>
+            </div>
+        </div>
+
+        <div x-show="view === 'audit'" x-cloak>
+            <div class="bg-white border rounded-2xl p-6 shadow-sm min-h-[500px]">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 class="text-xl font-bold">Transaction Audit Log</h2>
+                        <p class="text-sm text-gray-400"><span x-text="filteredAuditLogs().length"></span> transactions matching filters</p>
+                    </div>
+                    <span class="text-green-500 text-sm font-medium border border-green-100 bg-green-50 px-3 py-1 rounded-lg"><i class="fas fa-check-circle mr-1"></i> All changes logged</span>
+                </div>
+
+                <div class="flex space-x-4 mb-6">
+                    <div class="flex-1 relative">
+                        <i class="fas fa-search absolute left-3 top-3 text-gray-300"></i>
+                        <input type="text" x-model="searchQuery" placeholder="Search by admin, note, or location..." class="w-full pl-10 pr-4 py-2 border rounded-xl bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blood-red">
+                    </div>
+                    <select x-model="auditActionFilter" class="border rounded-xl bg-gray-50 px-4 py-2 text-sm focus:ring-1 focus:ring-blood-red">
+                        <option value="All Actions">All Actions</option>
+                        <option value="Stock Update">Stock Updates</option>
+                        <option value="Bulk Restock">Bulk Restock</option>
+                        <option value="Capacity Change">Capacity Changes</option>
+                    </select>
+                    <select x-model="auditBloodFilter" class="border rounded-xl bg-gray-50 px-4 py-2 text-sm focus:ring-1 focus:ring-blood-red">
+                        <option value="All Blood Types">All Blood Types</option>
+                        <template x-for="type in ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-']">
+                            <option :value="type" x-text="type"></option>
+                        </template>
+                    </select>
+                </div>
+
+                <div class="space-y-3">
+                    <template x-for="log in filteredAuditLogs()">
+                        <div class="flex items-center justify-between p-4 border-b hover:bg-gray-50 transition-colors">
+                            <div class="flex items-center space-x-4">
+                                <div class="w-10 h-10 rounded-xl flex items-center justify-center" 
+                                     :class="log.type === 'Stock Update' ? 'bg-blue-50 text-blue-500' : 
+                                             log.type === 'Bulk Restock' ? 'bg-green-50 text-green-500' : 'bg-purple-50 text-purple-500'">
+                                    <i :class="log.type === 'Stock Update' ? 'fas fa-sync-alt' : 
+                                               log.type === 'Bulk Restock' ? 'fas fa-layer-group' : 'fas fa-cog'"></i>
+                                </div>
+                                <div>
+                                    <div class="flex items-center space-x-2">
+                                        <span class="font-bold" x-text="log.type"></span>
+                                        <span class="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-bold" x-text="log.bloodType"></span>
+                                        <span x-show="log.change !== 0" :class="log.change > 0 ? 'text-green-600' : 'text-red-600'" class="font-bold" x-text="log.change > 0 ? '+' + log.change : log.change"></span>
+                                    </div>
+                                    <div class="text-xs text-gray-400 mt-1 flex space-x-3">
+                                        <span><i class="far fa-user mr-1"></i> <span x-text="log.user"></span></span>
+                                        <span><i class="fas fa-map-marker-alt mr-1"></i> <span x-text="log.location"></span></span>
+                                        <span><i class="far fa-clock mr-1"></i> <span x-text="log.time"></span></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down text-gray-300 text-xs"></i>
+                        </div>
+                    </template>
+                    <div x-show="filteredAuditLogs().length === 0" class="text-center py-12 text-gray-400">
+                        No transactions match your search.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div x-show="editing" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
+        <div @click.away="editing = false" class="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
+            <div class="bg-blood-red p-6 text-white flex justify-between items-start">
+                <div class="flex items-center space-x-4">
+                    <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center text-xl font-bold" x-text="editItem.type"></div>
+                    <div>
+                        <h2 class="text-xl font-bold">Edit Stock — <span x-text="editItem.type"></span></h2>
+                        <p class="text-xs opacity-80">Update inventory levels and details</p>
+                    </div>
+                </div>
+                <button @click="editing = false" class="bg-white/20 hover:bg-white/30 rounded-full p-2 transition-colors"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <div class="p-6 space-y-6">
+                <div class="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Live Preview</span>
+                        <span :class="getStatusClass(editItem.status)" class="px-3 py-0.5 rounded-full text-[10px] font-bold" x-text="editItem.status"></span>
+                    </div>
+                    <div class="flex justify-between items-end mb-1">
+                        <span class="font-bold text-lg"><span x-text="editItem.units"></span> units</span>
+                        <span class="text-xs text-gray-400">of <span x-text="editItem.max"></span> max</span>
+                    </div>
+                    <div class="w-full bg-gray-200 h-2 rounded-full relative">
+                        <div class="h-2 rounded-full transition-all duration-300" :class="getBarColor(editItem.status)" :style="`width: ${(editItem.units/editItem.max)*100}%`"></div>
+                    </div>
+                    <p class="text-right text-[10px] text-gray-400 mt-1" x-text="Math.round((editItem.units/editItem.max)*100) + '% capacity'"></p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs font-bold text-gray-500 mb-1 block">Current Units</label>
+                        <div class="flex border rounded-lg overflow-hidden">
+                            <button @click="editItem.units = Math.max(0, editItem.units - 1); updateEditStatus()" class="px-3 bg-gray-50 border-r hover:bg-gray-100">-</button>
+                            <input type="number" x-model.number="editItem.units" @input="updateEditStatus()" class="w-full text-center py-2 focus:outline-none">
+                            <button @click="editItem.units = Math.min(editItem.max, editItem.units + 1); updateEditStatus()" class="px-3 bg-gray-50 border-l hover:bg-gray-100">+</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-gray-500 mb-1 block">Max Capacity</label>
+                        <input type="number" x-model.number="editItem.max" @input="updateEditStatus()" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blood-red">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="text-xs font-bold text-gray-500 mb-1 block">Reserved Units</label>
+                    <div class="flex border rounded-lg overflow-hidden">
+                        <button @click="editItem.reserved = Math.max(0, editItem.reserved - 1)" class="px-3 bg-gray-50 border-r hover:bg-gray-100">-</button>
+                        <input type="number" x-model.number="editItem.reserved" class="w-full text-center py-2 focus:outline-none">
+                        <button @click="editItem.reserved++" class="px-3 bg-gray-50 border-l hover:bg-gray-100">+</button>
+                    </div>
+                    <p class="text-[10px] text-gray-400 mt-1">Units reserved for pending requests</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs font-bold text-gray-500 mb-1 block">Storage Location</label>
+                        <select x-model="editItem.location" class="w-full border rounded-lg px-3 py-2 text-sm">
+                            <option>Central Blood Bank</option>
+                            <option>City General Hospital</option>
+                            <option>North District Hub</option>
+                            <option>South District Hub</option>
+                            <option>Downtown Clinic</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-gray-500 mb-1 block">Expiring In</label>
+                        <select x-model="editItem.expiry" class="w-full border rounded-lg px-3 py-2 text-sm">
+                            <option value="3">3 days</option>
+                            <option value="7">7 days</option>
+                            <option value="14">14 days</option>
+                            <option value="21">21 days</option>
+                            <option value="30">30 days</option>
+                            <option value="42">42 days</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="text-xs font-bold text-gray-500 mb-1 block">Update Note (optional)</label>
+                    <textarea x-model="editNote" placeholder="e.g. Received new shipment from Red Cross..." class="w-full border rounded-xl p-3 text-sm h-20 focus:outline-none focus:ring-1 focus:ring-blood-red"></textarea>
+                </div>
+
+                <div class="flex space-x-3">
+                    <button @click="editing = false" class="flex-1 py-3 border rounded-xl font-bold text-gray-600 hover:bg-gray-50">Cancel</button>
+                    <button @click="saveChanges()" class="flex-1 py-3 bg-blood-red text-white rounded-xl font-bold shadow-lg hover:opacity-90 flex items-center justify-center transition-all">
+                        <i class="far fa-save mr-2"></i> Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function bloodApp() {
+            return {
+                view: 'inventory',
+                display: 'grid',
+                filter: 'All Types',
+                editing: false,
+                editItem: {},
+                editNote: '',
+                searchQuery: '',
+                auditActionFilter: 'All Actions',
+                auditBloodFilter: 'All Blood Types',
+                inventory: [
+                    { type: 'O+', status: 'Adequate', units: 145, max: 200, location: 'Central Blood Bank', reserved: 12, expiry: 21 },
+                    { type: 'O-', status: 'Critical', units: 28, max: 150, location: 'City General Hospital', reserved: 8, expiry: 7 },
+                    { type: 'A+', status: 'Good', units: 167, max: 200, location: 'Central Blood Bank', reserved: 20, expiry: 30 },
+                    { type: 'A-', status: 'Low', units: 52, max: 120, location: 'Downtown Clinic', reserved: 5, expiry: 14 },
+                    { type: 'B+', status: 'Adequate', units: 98, max: 150, location: 'North District Hub', reserved: 10, expiry: 21 },
+                    { type: 'B-', status: 'Low', units: 34, max: 100, location: 'South District Hub', reserved: 4, expiry: 14 },
+                    { type: 'AB+', status: 'Good', units: 76, max: 100, location: 'Central Blood Bank', reserved: 6, expiry: 42 },
+                    { type: 'AB-', status: 'Critical', units: 19, max: 80, location: 'City General Hospital', reserved: 3, expiry: 3 }
+                ],
+                auditLogs: [
+                    { type: 'Stock Update', bloodType: 'O+', change: -5, user: 'Admin User', location: 'Central Blood Bank', time: '1 min ago' },
+                    { type: 'Stock Update', bloodType: 'O+', change: 5, user: 'Admin User', location: 'Central Blood Bank', time: '2 mins ago' },
+                    { type: 'Stock Update', bloodType: 'O-', change: 5, user: 'Sarah Mitchell', location: 'City General Hospital', time: 'Mar 23, 2026' },
+                    { type: 'Stock Update', bloodType: 'AB-', change: -3, user: 'Dr. James Peterson', location: 'Central Blood Bank', time: 'Mar 23, 2026' },
+                    { type: 'Bulk Restock', bloodType: 'Multiple', change: 45, user: 'Sarah Mitchell', location: 'Central Blood Bank', time: 'Mar 23, 2026' },
+                    { type: 'Capacity Change', bloodType: 'O+', change: 0, user: 'Dr. James Peterson', location: 'Central Blood Bank', time: 'Mar 23, 2026' }
+                ],
+
+                filteredInventory() {
+                    if (this.filter === 'All Types') return this.inventory;
+                    return this.inventory.filter(i => i.status === this.filter);
+                },
+
+                filteredAuditLogs() {
+                    return this.auditLogs.filter(log => {
+                        const matchesSearch = log.user.toLowerCase().includes(this.searchQuery.toLowerCase()) || 
+                                              log.location.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+                                              log.type.toLowerCase().includes(this.searchQuery.toLowerCase());
+                        
+                        const matchesAction = this.auditActionFilter === 'All Actions' || log.type === this.auditActionFilter;
+                        const matchesBlood = this.auditBloodFilter === 'All Blood Types' || log.bloodType === this.auditBloodFilter;
+                        
+                        return matchesSearch && matchesAction && matchesBlood;
+                    });
+                },
+
+                totalUnits() {
+                    return this.inventory.reduce((acc, curr) => acc + curr.units, 0);
+                },
+
+                countByStatus(status) {
+                    return this.inventory.filter(i => i.status === status).length;
+                },
+
+                updateStock(item, amount) {
+                    const originalValue = item.units;
+                    item.units = Math.min(item.max, Math.max(0, item.units + amount));
+                    this.updateStatus(item);
+                    
+                    this.auditLogs.unshift({
+                        type: 'Stock Update',
+                        bloodType: item.type,
+                        change: item.units - originalValue,
+                        user: 'Admin User',
+                        location: item.location,
+                        time: 'Just now'
+                    });
+                },
+
+                updateStatus(item) {
+                    const percentage = (item.units / item.max) * 100;
+                    if (percentage <= 20) item.status = 'Critical';
+                    else if (percentage <= 40) item.status = 'Low';
+                    else if (percentage <= 70) item.status = 'Adequate';
+                    else item.status = 'Good';
+                },
+
+                getStatusClass(status) {
+                    return {
+                        'Critical': 'bg-red-100 text-red-600',
+                        'Low': 'bg-orange-100 text-orange-600',
+                        'Adequate': 'bg-yellow-100 text-yellow-600',
+                        'Good': 'bg-green-100 text-green-600'
+                    }[status];
+                },
+
+                getBarColor(status) {
+                    return {
+                        'Critical': 'bg-red-500',
+                        'Low': 'bg-orange-400',
+                        'Adequate': 'bg-yellow-400',
+                        'Good': 'bg-green-500'
+                    }[status];
+                },
+
+                openEdit(item) {
+                    this.editItem = JSON.parse(JSON.stringify(item));
+                    this.editNote = '';
+                    this.editing = true;
+                },
+
+                updateEditStatus() {
+                    const percentage = (this.editItem.units / this.editItem.max) * 100;
+                    if (percentage <= 20) this.editItem.status = 'Critical';
+                    else if (percentage <= 40) this.editItem.status = 'Low';
+                    else if (percentage <= 70) this.editItem.status = 'Adequate';
+                    else this.editItem.status = 'Good';
+                },
+
+                saveChanges() {
+                    const index = this.inventory.findIndex(i => i.type === this.editItem.type);
+                    if (index !== -1) {
+                        const oldUnits = this.inventory[index].units;
+                        this.inventory[index] = JSON.parse(JSON.stringify(this.editItem));
+                        
+                        if (oldUnits !== this.editItem.units) {
+                            this.auditLogs.unshift({
+                                type: 'Stock Update',
+                                bloodType: this.editItem.type,
+                                change: this.editItem.units - oldUnits,
+                                user: 'Admin User',
+                                location: this.editItem.location,
+                                time: 'Just now'
+                            });
+                        }
+                    }
+                    this.editing = false;
+                }
+            }
+        }
+    </script>
+</body>
+</html>
